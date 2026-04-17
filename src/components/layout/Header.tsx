@@ -36,11 +36,8 @@ export default function Header({
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
-              <div className="w-8 h-8 rounded-lg gradient-button flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <span className="font-display text-lg font-bold">dreamt.cards</span>
+            <Link href="/" className="flex items-center gap-1.5" onClick={() => setMobileOpen(false)}>
+              <span className="font-cursive text-[1.65rem] leading-none gradient-text select-none">Dreamt Cards</span>
             </Link>
 
             {/* Desktop nav */}

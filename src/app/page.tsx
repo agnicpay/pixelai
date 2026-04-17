@@ -199,7 +199,8 @@ export default function LandingPage() {
             transition={{ delay: 0.25 }}
           >
             <h2 className="font-display text-2xl sm:text-3xl font-bold text-center mb-3">
-              Made with dreamt.cards
+              Made with{" "}
+              <span className="font-cursive text-3xl sm:text-4xl gradient-text align-middle leading-none">Dreamt Cards</span>
             </h2>
             <p className="text-center text-white/40 text-sm mb-10">
               Click any to try the prompt yourself
