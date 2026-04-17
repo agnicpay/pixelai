@@ -31,6 +31,11 @@ export default function LoginGate({ onLogin, onAuthSuccess }: LoginGateProps) {
   // Listen for postMessage from popup callback
   const handleMessage = useCallback(
     (event: MessageEvent) => {
+      console.log("[LoginGate] message received", {
+        origin: event.origin,
+        expectedOrigin: window.location.origin,
+        data: event.data,
+      });
       // Only accept messages from our own origin
       if (event.origin !== window.location.origin) return;
       if (event.data?.type !== "agnic-oauth-result") return;
@@ -87,16 +92,37 @@ export default function LoginGate({ onLogin, onAuthSuccess }: LoginGateProps) {
     setAuthState("waiting");
 
     // Poll for popup manually closed
-    pollRef.current = setInterval(() => {
-      if (popup.closed) {
-        if (pollRef.current) clearInterval(pollRef.current);
-        pollRef.current = null;
-        window.removeEventListener("message", handleMessage);
-        // Only reset if still waiting (not already handled by postMessage)
-        setAuthState((prev) => (prev === "waiting" ? "idle" : prev));
+    pollRef.current = setInterval(async () => {
+      if (!popup.closed) return;
+
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = null;
+
+      // Give any pending postMessage a moment to be dispatched
+      // before we fall back to re-checking the session ourselves.
+      await new Promise((r) => setTimeout(r, 150));
+
+      // Fallback: the postMessage may have been dropped by a cross-origin
+      // navigation (COOP severing the opener) or by a target-origin
+      // mismatch. Ask the server directly.
+      try {
+        const res = await fetch("/api/session", { cache: "no-store" });
+        const data = await res.json();
+        console.log("[LoginGate] popup closed, /api/session →", data);
+        if (data.authenticated) {
+          window.removeEventListener("message", handleMessage);
+          setAuthState("idle");
+          onAuthSuccess?.();
+          return;
+        }
+      } catch (err) {
+        console.warn("[LoginGate] session recheck failed", err);
       }
+
+      window.removeEventListener("message", handleMessage);
+      setAuthState((prev) => (prev === "waiting" ? "idle" : prev));
     }, 500);
-  }, [handleMessage, onLogin]);
+  }, [handleMessage, onAuthSuccess, onLogin]);
 
   const handleClick = () => {
     if (isMobile) {

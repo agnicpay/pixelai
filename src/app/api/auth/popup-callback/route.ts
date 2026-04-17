@@ -41,6 +41,12 @@ export async function GET(req: NextRequest) {
       redirectUri,
     );
 
+    console.log("[popup-callback] token exchange ok", {
+      has_access: !!tokens.access_token,
+      has_refresh: !!tokens.refresh_token,
+      expires_in: tokens.expires_in,
+    });
+
     // Store tokens in session (httpOnly cookie — never exposed to client JS)
     session.access_token = tokens.access_token;
     session.refresh_token = tokens.refresh_token;
@@ -52,6 +58,9 @@ export async function GET(req: NextRequest) {
 
     await session.save();
 
+    console.log("[popup-callback] session saved, returning success HTML", {
+      appUrl,
+    });
     return popupResponse(appUrl, true);
   } catch (error) {
     console.error("OAuth popup callback error:", error);
@@ -81,12 +90,20 @@ function popupResponse(
 <p>${success ? "Authorization complete. This window will close." : "Authorization failed. This window will close."}</p>
 <script>
 (function() {
+  function closeSoon() {
+    // Give the message a tick to dispatch before we close.
+    setTimeout(function() { try { window.close(); } catch (e) {} }, 150);
+  }
   try {
-    if (window.opener) {
-      window.opener.postMessage(${message}, ${JSON.stringify(appUrl)});
-      window.close();
+    if (window.opener && !window.opener.closed) {
+      // Post to the opener's exact origin AND to "*" as a belt-and-braces fallback,
+      // in case NEXT_PUBLIC_APP_URL doesn't exactly match the opener's origin.
+      try { window.opener.postMessage(${message}, ${JSON.stringify(appUrl)}); } catch (e) {}
+      try { window.opener.postMessage(${message}, "*"); } catch (e) {}
+      closeSoon();
     } else {
-      // Fallback: no opener (popup blocked, or opened as tab)
+      // No opener (popup blocked, opened as tab, or COOP severed). Navigate back —
+      // the parent page will re-check /api/session on mount and pick up the session.
       window.location.href = ${JSON.stringify(appUrl + "/create")};
     }
   } catch(e) {
