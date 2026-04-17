@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidAccessToken } from "@/lib/auth";
 import { generateImage, getBalance } from "@/lib/agnic";
-import { STYLES, DEFAULT_MODEL } from "@/lib/constants";
+import { STYLES, DEFAULT_MODEL, MODELS } from "@/lib/constants";
+
+const MAX_REFERENCE_IMAGE_CHARS = 900_000;
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,10 +13,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { prompt, model, style } = body as {
+    const { prompt, model, style, referenceImage } = body as {
       prompt?: string;
       model?: string;
       style?: string;
+      referenceImage?: string;
     };
 
     if (!prompt?.trim()) {
@@ -28,8 +31,28 @@ export async function POST(req: NextRequest) {
       : prompt.trim();
 
     const selectedModel = model || DEFAULT_MODEL.id;
+    const modelConfig = MODELS.find((m) => m.id === selectedModel);
 
-    const result = await generateImage(fullPrompt, selectedModel, token);
+    if (referenceImage && !modelConfig?.supportsReferenceImage) {
+      return NextResponse.json(
+        { error: "Selected model does not support reference images" },
+        { status: 400 },
+      );
+    }
+
+    if (referenceImage && referenceImage.length > MAX_REFERENCE_IMAGE_CHARS) {
+      return NextResponse.json(
+        { error: "Reference image too large. Please upload a smaller image." },
+        { status: 413 },
+      );
+    }
+
+    const imageInput =
+      typeof referenceImage === "string" && referenceImage.startsWith("data:image/")
+        ? referenceImage
+        : undefined;
+
+    const result = await generateImage(fullPrompt, selectedModel, token, imageInput);
 
     // Fetch updated balance
     let balance: number | undefined;

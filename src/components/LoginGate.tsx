@@ -132,7 +132,7 @@ export default function LoginGate({ onLogin, onAuthSuccess }: LoginGateProps) {
         return (
           <>
             <Wallet className="w-4 h-4" />
-            Connect Payment Wallet
+            Get started free
           </>
         );
     }
@@ -151,10 +151,10 @@ export default function LoginGate({ onLogin, onAuthSuccess }: LoginGateProps) {
 
         <div className="space-y-2">
           <h2 className="font-display text-2xl font-bold">
-            Connect Payment Wallet
+            Start creating for free
           </h2>
           <p className="text-white/50 text-sm">
-            Link your AgnicPay wallet to start generating images
+            Sign in to claim your $5 free credit — no subscription needed
           </p>
         </div>
 
@@ -169,7 +169,7 @@ export default function LoginGate({ onLogin, onAuthSuccess }: LoginGateProps) {
           </div>
           <div className="flex items-center gap-3 text-sm text-white/60">
             <Wallet className="w-4 h-4 text-purple-400 flex-shrink-0" />
-            <span>Pay only for what you use</span>
+            <span>No monthly fee — pay only for what you use</span>
           </div>
           <div className="flex items-center gap-3 text-sm text-white/60">
             <Shield className="w-4 h-4 text-purple-400 flex-shrink-0" />
@@ -200,7 +200,7 @@ export default function LoginGate({ onLogin, onAuthSuccess }: LoginGateProps) {
           </Button>
         )}
 
-        <p className="text-xs text-white/30">Secured by AgnicPay</p>
+        <p className="text-xs text-white/30">Powered by AgnicPay · revoke access anytime</p>
       </div>
     </motion.div>
   );

@@ -8,7 +8,7 @@ export default function Footer() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-white/40">
             <Sparkles className="w-4 h-4" />
-            <span className="text-sm">PixelAI</span>
+            <span className="text-sm">dreamt.cards</span>
             <span className="text-white/20">·</span>
             <span className="text-sm">Powered by AgnicWallet</span>
           </div>

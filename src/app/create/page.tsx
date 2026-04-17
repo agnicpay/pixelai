@@ -13,7 +13,7 @@ import LoginGate from "@/components/LoginGate";
 import Spinner from "@/components/ui/Spinner";
 import { AlertTriangle, X } from "lucide-react";
 import Button from "@/components/ui/Button";
-import { DEFAULT_MODEL, AGNIC_AUTH_URL } from "@/lib/constants";
+import { DEFAULT_MODEL, MODELS } from "@/lib/constants";
 import { addToGallery } from "@/lib/gallery";
 
 interface GeneratedImage {
@@ -83,7 +83,7 @@ export default function CreatePage() {
     window.open("https://pay.agnic.ai/settings/credit", "_blank");
   };
 
-  const handleGenerate = async (prompt: string) => {
+  const handleGenerate = async (prompt: string, referenceImage?: string) => {
     setIsGenerating(true);
     setGeneratedImage(null);
     setImageSaved(false);
@@ -94,6 +94,7 @@ export default function CreatePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt,
+          referenceImage,
           model: selectedModel,
           style: selectedStyle,
         }),
@@ -226,6 +227,8 @@ export default function CreatePage() {
   }
 
   // Authenticated — full creation UI
+  const selectedModelConfig = MODELS.find((m) => m.id === selectedModel);
+
   return (
     <>
       <Header
@@ -251,6 +254,7 @@ export default function CreatePage() {
               onEnhance={handleEnhance}
               isGenerating={isGenerating}
               isEnhancing={isEnhancing}
+              supportsReferenceImage={selectedModelConfig?.supportsReferenceImage ?? false}
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">

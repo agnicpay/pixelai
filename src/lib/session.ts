@@ -11,7 +11,7 @@ export interface SessionData {
 
 export const sessionOptions: SessionOptions = {
   password: process.env.SESSION_SECRET || "change_me_to_a_random_32_char_hex_string_here!",
-  cookieName: "pixelai_session",
+  cookieName: "dreamt_session",
   cookieOptions: {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,

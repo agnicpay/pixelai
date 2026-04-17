@@ -5,13 +5,7 @@ export const MODELS = [
     cost: 0.00124,
     tag: "Best Value",
     default: true,
-  },
-  {
-    id: "google/gemini-2.5-flash-image-preview",
-    name: "Gemini 2.5 Flash Preview",
-    cost: 0.00124,
-    tag: null,
-    default: false,
+    supportsReferenceImage: true,
   },
   {
     id: "google/gemini-3-pro-image-preview",
@@ -19,6 +13,7 @@ export const MODELS = [
     cost: 0.067,
     tag: "High Quality",
     default: false,
+    supportsReferenceImage: true,
   },
   {
     id: "openai/gpt-5-image",
@@ -26,6 +21,7 @@ export const MODELS = [
     cost: 0.00001,
     tag: null,
     default: false,
+    supportsReferenceImage: true,
   },
   {
     id: "openai/gpt-5-image-mini",
@@ -33,6 +29,7 @@ export const MODELS = [
     cost: 0.0000025,
     tag: "Cheapest",
     default: false,
+    supportsReferenceImage: true,
   },
 ] as const;
 
@@ -49,6 +46,10 @@ export const STYLES = [
 ] as const;
 
 export const DEFAULT_MODEL = MODELS.find((m) => m.default)!;
+
+export const MODEL_MAP = Object.fromEntries(
+  MODELS.map((model) => [model.id, model]),
+) as Record<(typeof MODELS)[number]["id"], (typeof MODELS)[number]>;
 
 export const AGNIC_API_BASE = process.env.AGNIC_API_BASE || "https://api.agnic.ai";
 export const AGNIC_AUTH_URL = process.env.NEXT_PUBLIC_AGNIC_AUTH_URL || "https://app.agnic.ai";

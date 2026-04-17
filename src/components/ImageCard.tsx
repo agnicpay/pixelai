@@ -33,7 +33,7 @@ export default function ImageCard({
   const handleDownload = () => {
     const link = document.createElement("a");
     link.href = image;
-    link.download = `pixelai-${Date.now()}.png`;
+    link.download = `dreamt-${Date.now()}.png`;
     link.click();
   };
 

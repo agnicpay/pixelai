@@ -10,7 +10,7 @@ export interface GalleryItem {
   createdAt: string;
 }
 
-const STORAGE_KEY = "pixelai_gallery";
+const STORAGE_KEY = "dreamt_gallery";
 
 export function getGallery(): GalleryItem[] {
   if (typeof window === "undefined") return [];
@@ -30,13 +30,31 @@ export function addToGallery(item: Omit<GalleryItem, "id" | "createdAt">) {
     createdAt: new Date().toISOString(),
   };
   gallery.unshift(newItem);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(gallery));
+
+  // Evict oldest items until the payload fits within localStorage quota
+  while (gallery.length > 0) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(gallery));
+      break;
+    } catch (e) {
+      if ((e as DOMException)?.name === "QuotaExceededError") {
+        gallery.pop();
+      } else {
+        break;
+      }
+    }
+  }
+
   return newItem;
 }
 
 export function removeFromGallery(id: string) {
   const gallery = getGallery().filter((item) => item.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(gallery));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(gallery));
+  } catch {
+    // gallery is smaller after removal — this shouldn't fail, but guard anyway
+  }
 }
 
 export function clearGallery() {

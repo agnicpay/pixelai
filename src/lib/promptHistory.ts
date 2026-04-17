@@ -1,6 +1,6 @@
 "use client";
 
-const STORAGE_KEY = "pixelai_prompt_history";
+const STORAGE_KEY = "dreamt_prompt_history";
 const MAX_HISTORY_ITEMS = 10;
 
 function normalizePrompt(prompt: string): string {

@@ -12,12 +12,20 @@ export async function generateImage(
   prompt: string,
   model: string,
   accessToken: string,
+  referenceImage?: string,
 ) {
   const client = createAgnicClient(accessToken);
 
+  const content = referenceImage
+    ? [
+        { type: "text", text: prompt },
+        { type: "image_url", image_url: { url: referenceImage } },
+      ]
+    : prompt;
+
   const response = await client.chat.completions.create({
     model,
-    messages: [{ role: "user", content: prompt }],
+    messages: [{ role: "user", content }] as never,
     modalities: ["image", "text"] as unknown as ["text"],
     max_tokens: 1024,
   });

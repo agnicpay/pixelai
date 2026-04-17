@@ -3,12 +3,12 @@ import { Toaster } from "sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PixelAI — AI Image Generation",
+  title: "dreamt.cards — Turn any idea into fire visuals",
   description:
-    "Create stunning AI-generated images with PixelAI. Powered by state-of-the-art models. Pay per image, no subscriptions.",
+    "AI image generator for creators. Comic panels, TikTok content, school projects, OC art — generated in seconds. $5 free credit, no subscription.",
   openGraph: {
-    title: "PixelAI — AI Image Generation",
-    description: "Create stunning AI-generated images with PixelAI.",
+    title: "dreamt.cards — Turn any idea into fire visuals",
+    description: "AI image generator for creators. $5 free credit, no subscription.",
     type: "website",
   },
 };
