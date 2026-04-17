@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Wand2, Send } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Clock3, Wand2, Send, Trash2 } from "lucide-react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
+import {
+  addPromptToHistory,
+  clearPromptHistory,
+  getPromptHistory,
+} from "@/lib/promptHistory";
 
 interface PromptInputProps {
   onGenerate: (prompt: string) => void;
@@ -20,10 +25,17 @@ export default function PromptInput({
   isEnhancing,
 }: PromptInputProps) {
   const [prompt, setPrompt] = useState("");
+  const [history, setHistory] = useState<string[]>([]);
+
+  useEffect(() => {
+    setHistory(getPromptHistory());
+  }, []);
 
   const handleSubmit = () => {
     if (!prompt.trim() || isGenerating) return;
-    onGenerate(prompt.trim());
+    const cleaned = prompt.trim();
+    setHistory(addPromptToHistory(cleaned));
+    onGenerate(cleaned);
   };
 
   const handleEnhance = async () => {
@@ -92,6 +104,42 @@ export default function PromptInput({
           )}
         </Button>
       </div>
+
+      {history.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="inline-flex items-center gap-1.5 text-xs text-white/45">
+              <Clock3 className="h-3.5 w-3.5" />
+              Recent prompts
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                clearPromptHistory();
+                setHistory([]);
+              }}
+              className="inline-flex items-center gap-1 text-xs text-white/35 hover:text-white/65 transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Clear
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {history.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setPrompt(item)}
+                className="max-w-full rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-white/70 hover:border-white/20 hover:bg-white/[0.06] hover:text-white transition-all"
+                title={item}
+              >
+                <span className="block max-w-[300px] truncate">{item}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

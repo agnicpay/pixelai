@@ -161,7 +161,7 @@ export default function LoginGate({ onLogin, onAuthSuccess }: LoginGateProps) {
         <div className="space-y-3 text-left">
           <div className="flex items-center gap-3 text-sm text-white/60">
             <Gift className="w-4 h-4 text-purple-400 flex-shrink-0" />
-            <span>$1.00 free credit to start</span>
+            <span>$5.00 free credit to start</span>
           </div>
           <div className="flex items-center gap-3 text-sm text-white/60">
             <Zap className="w-4 h-4 text-purple-400 flex-shrink-0" />
