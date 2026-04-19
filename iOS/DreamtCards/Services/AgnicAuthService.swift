@@ -46,8 +46,8 @@ final class AgnicAuthService: NSObject {
     private let agnicAuthURL    = "https://api.agnic.ai/oauth/authorize"
     private let agnicTokenURL   = "https://api.agnic.ai/oauth/token"
     private let agnicBalanceURL = "https://api.agnic.ai/api/balance?network=base"
-    private let clientId        = "pixelai"
-    private let redirectURI     = "dreamtcards://callback"
+    private let clientId        = "app_20705b7c760e0fd1be05c68f"
+    private let redirectURI     = "https://dreamt.cards/ios-callback"
     private let storageKey      = "dreamt_agnic_tokens_v1"
 
     private var authSession: ASWebAuthenticationSession?
@@ -110,6 +110,10 @@ final class AgnicAuthService: NSObject {
         ]
         guard let authURL = components.url else { throw AgnicError.invalidCallback }
 
+        print("[AgnicAuth] Opening auth URL: \(authURL.absoluteString)")
+        print("[AgnicAuth] client_id: \(clientId)")
+        print("[AgnicAuth] redirect_uri: \(redirectURI)")
+
         let callbackURL: URL = try await withCheckedThrowingContinuation { continuation in
             let session = ASWebAuthenticationSession(
                 url: authURL,
@@ -123,8 +127,10 @@ final class AgnicAuthService: NSObject {
                         continuation.resume(throwing: error)
                     }
                 } else if let url {
+                    print("[AgnicAuth] Callback URL received: \(url.absoluteString)")
                     continuation.resume(returning: url)
                 } else {
+                    print("[AgnicAuth] ERROR: nil URL and nil error from ASWebAuthenticationSession")
                     continuation.resume(throwing: AgnicError.invalidCallback)
                 }
             }
@@ -160,8 +166,10 @@ final class AgnicAuthService: NSObject {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            let raw = String(data: data, encoding: .utf8) ?? "(unreadable)"
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let raw = String(data: data, encoding: .utf8) ?? "(unreadable)"
+        print("[AgnicAuth] Token exchange response [\(status)]: \(raw)")
+        guard status == 200 else {
             throw AgnicError.tokenExchangeFailed(raw)
         }
         return try parseTokenResponse(data)
