@@ -3,6 +3,8 @@ import crypto from "crypto";
 import { getSession } from "@/lib/session";
 import { generatePKCE, buildAuthUrl } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const redirectUri = `${appUrl}/api/auth/popup-callback`;

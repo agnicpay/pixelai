@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { exchangeCodeForTokens } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 

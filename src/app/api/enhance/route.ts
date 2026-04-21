@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidAccessToken } from "@/lib/auth";
 import { enhancePrompt, getBalance } from "@/lib/agnic";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   try {
     const token = await getValidAccessToken();

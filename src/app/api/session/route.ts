@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getValidAccessToken } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const token = await getValidAccessToken();
   return NextResponse.json({

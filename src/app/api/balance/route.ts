@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getValidAccessToken } from "@/lib/auth";
 import { getBalance } from "@/lib/agnic";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const token = await getValidAccessToken();

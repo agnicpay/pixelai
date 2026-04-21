@@ -3,6 +3,8 @@ import { getValidAccessToken } from "@/lib/auth";
 import { generateImage, getBalance } from "@/lib/agnic";
 import { STYLES, DEFAULT_MODEL, MODELS } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
 const MAX_REFERENCE_IMAGE_CHARS = 900_000;
 
 export async function POST(req: NextRequest) {
