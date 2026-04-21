@@ -110,7 +110,7 @@ export default function CreatePage() {
 
   const handleTopUp = () => {
     const returnUrl = `${window.location.origin}/create`;
-    const base = process.env.NEXT_PUBLIC_AGNIC_TOPUP_URL || "https://pay.agnic.ai/topup";
+    const base = process.env.NEXT_PUBLIC_AGNIC_TOPUP_URL || "https://app.agnic.ai/topup";
     const url = `${base}?client_id=pixelai&return_url=${encodeURIComponent(returnUrl)}`;
 
     // Popup on desktop, full redirect on mobile (narrow viewport).
