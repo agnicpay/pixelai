@@ -71,6 +71,35 @@ export default function CreatePage() {
     checkSession();
   }, [checkSession]);
 
+  // Listen for the Agnic top-up popup reporting completion. When it closes,
+  // refresh the balance so the new credit shows up without a page reload.
+  useEffect(() => {
+    const onMessage = (ev: MessageEvent) => {
+      if (!ev.data || typeof ev.data !== "object") return;
+      if (ev.data.type === "agnic:topup_complete") {
+        fetchBalance();
+        toast.success("Top-up successful — your balance is updated.");
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  // Also handle the redirect-mode return (mobile / popup-blocked): when the
+  // Checkout page redirects back with ?topup=success, refresh the balance.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("topup") === "success") {
+      fetchBalance();
+      toast.success("Top-up successful — your balance is updated.");
+      params.delete("topup");
+      params.delete("session_id");
+      const qs = params.toString();
+      window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    }
+  }, []);
+
   const handleLogin = () => {
     window.location.href = "/api/auth/login";
   };
@@ -80,7 +109,22 @@ export default function CreatePage() {
   }, [checkSession]);
 
   const handleTopUp = () => {
-    window.open("https://pay.agnic.ai/settings/credit", "_blank");
+    const returnUrl = `${window.location.origin}/create`;
+    const base = process.env.NEXT_PUBLIC_AGNIC_TOPUP_URL || "https://pay.agnic.ai/topup";
+    const url = `${base}?client_id=pixelai&return_url=${encodeURIComponent(returnUrl)}`;
+
+    // Popup on desktop, full redirect on mobile (narrow viewport).
+    const isNarrow = typeof window !== "undefined" && window.innerWidth < 640;
+    if (isNarrow) {
+      window.location.href = url;
+      return;
+    }
+
+    const width = 480;
+    const height = 720;
+    const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
+    const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+    window.open(url, "agnic-topup", `width=${width},height=${height},left=${left},top=${top},popup=yes`);
   };
 
   const handleGenerate = async (prompt: string, referenceImage?: string) => {
