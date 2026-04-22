@@ -8,14 +8,28 @@ export function createAgnicClient(accessToken: string) {
   });
 }
 
+// Raw /v1/chat/completions response shape (OpenRouter-compatible). We use a
+// direct fetch for image generation because the OpenAI SDK only models its
+// own schema and silently drops the non-standard `message.images[]` field
+// that OpenRouter returns for image-output models — so the SDK path was
+// handing us a response with no image even though the gateway had one.
+interface RawCompletionResponse {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+      images?: Array<{ image_url?: { url?: string } }>;
+    };
+  }>;
+  usage?: unknown;
+  error?: { message?: string; code?: string | number };
+}
+
 export async function generateImage(
   prompt: string,
   model: string,
   accessToken: string,
   referenceImages?: string[],
 ) {
-  const client = createAgnicClient(accessToken);
-
   const refs = (referenceImages || []).filter(
     (s): s is string => typeof s === "string" && s.length > 0,
   );
@@ -31,26 +45,42 @@ export async function generateImage(
         ]
       : prompt;
 
-  const response = await client.chat.completions.create({
-    model,
-    messages: [{ role: "user", content }] as never,
-    modalities: ["image", "text"] as unknown as ["text"],
-    max_tokens: 1024,
+  const res = await fetch(`${AGNIC_API_BASE}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content }],
+      modalities: ["image", "text"],
+      max_tokens: 1024,
+    }),
   });
 
-  const choice = response.choices[0];
-  const message = choice?.message as unknown as Record<string, unknown>;
-  const images = message?.images as Array<{ image_url: { url: string } }> | undefined;
-  const imageUrl = images?.[0]?.image_url?.url;
-  const text = (message?.content as string) || "";
+  if (!res.ok) {
+    const bodyText = await res.text();
+    throw new Error(
+      `Agnic API error ${res.status}: ${bodyText.slice(0, 500)}`,
+    );
+  }
 
-  const usage = response.usage;
+  const data: RawCompletionResponse = await res.json();
+
+  if (data.error) {
+    throw new Error(data.error.message || "Agnic API returned an error");
+  }
+
+  const message = data.choices?.[0]?.message;
+  const imageUrl = message?.images?.[0]?.image_url?.url || null;
+  const text = message?.content || "";
 
   return {
-    image: imageUrl || null,
+    image: imageUrl,
     text,
     model,
-    usage,
+    usage: data.usage,
   };
 }
 

@@ -6,11 +6,18 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(amount: number): string {
+  // Per-image costs can be as low as ~$0.0003. Locking to 2 decimals hides
+  // per-gen balance changes on typical $1–$10 wallets; widen precision when
+  // the balance is small so the deduction is visible.
+  const abs = Math.abs(amount);
+  let fractionDigits = 2;
+  if (abs < 10) fractionDigits = 4;
+  if (abs < 0.01) fractionDigits = 5;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   }).format(amount);
 }
 
