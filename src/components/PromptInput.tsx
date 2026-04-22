@@ -13,7 +13,7 @@ import {
 } from "@/lib/promptHistory";
 
 interface PromptInputProps {
-  onGenerate: (prompt: string, referenceImage?: string) => void;
+  onGenerate: (prompt: string, referenceImages?: string[]) => void;
   onEnhance: (prompt: string) => Promise<string>;
   isGenerating: boolean;
   isEnhancing: boolean;
@@ -22,6 +22,13 @@ interface PromptInputProps {
 
 const MAX_REFERENCE_IMAGE_BYTES = 650 * 1024;
 const MAX_REFERENCE_IMAGE_DIMENSION = 1280;
+export const MAX_REFERENCE_IMAGES = 3;
+
+interface ReferenceImage {
+  dataUrl: string;
+  name: string;
+  sizeLabel: string;
+}
 
 function dataUrlByteSize(dataUrl: string): number {
   const base64 = dataUrl.split(",")[1] || "";
@@ -38,6 +45,54 @@ function loadImageFromDataUrl(dataUrl: string): Promise<HTMLImageElement> {
   });
 }
 
+async function compressImage(file: File): Promise<ReferenceImage | null> {
+  if (!file.type.startsWith("image/")) return null;
+
+  const sourceDataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Failed to read image"));
+    reader.readAsDataURL(file);
+  });
+
+  const sourceImage = await loadImageFromDataUrl(sourceDataUrl);
+  const scale = Math.min(
+    1,
+    MAX_REFERENCE_IMAGE_DIMENSION / Math.max(sourceImage.width, sourceImage.height),
+  );
+
+  let targetWidth = Math.max(1, Math.round(sourceImage.width * scale));
+  let targetHeight = Math.max(1, Math.round(sourceImage.height * scale));
+  let quality = 0.85;
+  let compressed = sourceDataUrl;
+
+  for (let i = 0; i < 6; i++) {
+    const canvas = document.createElement("canvas");
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) break;
+
+    ctx.drawImage(sourceImage, 0, 0, targetWidth, targetHeight);
+    compressed = canvas.toDataURL("image/jpeg", quality);
+
+    if (dataUrlByteSize(compressed) <= MAX_REFERENCE_IMAGE_BYTES) break;
+
+    quality = Math.max(0.55, quality - 0.1);
+    targetWidth = Math.max(1, Math.round(targetWidth * 0.85));
+    targetHeight = Math.max(1, Math.round(targetHeight * 0.85));
+  }
+
+  if (dataUrlByteSize(compressed) > MAX_REFERENCE_IMAGE_BYTES) return null;
+
+  return {
+    dataUrl: compressed,
+    name: file.name,
+    sizeLabel: `${Math.round(dataUrlByteSize(compressed) / 1024)} KB`,
+  };
+}
+
 export default function PromptInput({
   onGenerate,
   onEnhance,
@@ -47,19 +102,26 @@ export default function PromptInput({
 }: PromptInputProps) {
   const [prompt, setPrompt] = useState("");
   const [history, setHistory] = useState<string[]>([]);
-  const [referenceImage, setReferenceImage] = useState<string | undefined>();
-  const [referenceImageName, setReferenceImageName] = useState<string | undefined>();
-  const [referenceImageSizeLabel, setReferenceImageSizeLabel] = useState<string | undefined>();
+  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
 
   useEffect(() => {
     setHistory(getPromptHistory());
   }, []);
 
+  // Drop any staged references if the user switches to a model that can't use
+  // them — keeps server-side validation from rejecting the generate call.
+  useEffect(() => {
+    if (!supportsReferenceImage && referenceImages.length > 0) {
+      setReferenceImages([]);
+    }
+  }, [supportsReferenceImage, referenceImages.length]);
+
   const handleSubmit = () => {
     if (!prompt.trim() || isGenerating) return;
     const cleaned = prompt.trim();
     setHistory(addPromptToHistory(cleaned));
-    onGenerate(cleaned, referenceImage);
+    const urls = referenceImages.map((r) => r.dataUrl);
+    onGenerate(cleaned, urls.length > 0 ? urls : undefined);
   };
 
   const handleEnhance = async () => {
@@ -75,62 +137,43 @@ export default function PromptInput({
     }
   };
 
-  const handleImageChange = async (file: File | null) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) return;
-    try {
-      const sourceDataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ""));
-        reader.onerror = () => reject(new Error("Failed to read image"));
-        reader.readAsDataURL(file);
-      });
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const remaining = MAX_REFERENCE_IMAGES - referenceImages.length;
+    if (remaining <= 0) {
+      toast.error(`You can attach up to ${MAX_REFERENCE_IMAGES} reference images.`);
+      return;
+    }
 
-      const sourceImage = await loadImageFromDataUrl(sourceDataUrl);
-      const scale = Math.min(
-        1,
-        MAX_REFERENCE_IMAGE_DIMENSION / Math.max(sourceImage.width, sourceImage.height),
-      );
+    const selected = Array.from(files).slice(0, remaining);
+    const skipped = files.length - selected.length;
 
-      let targetWidth = Math.max(1, Math.round(sourceImage.width * scale));
-      let targetHeight = Math.max(1, Math.round(sourceImage.height * scale));
-      let quality = 0.85;
-      let compressed = sourceDataUrl;
-
-      for (let i = 0; i < 6; i++) {
-        const canvas = document.createElement("canvas");
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) break;
-
-        ctx.drawImage(sourceImage, 0, 0, targetWidth, targetHeight);
-        compressed = canvas.toDataURL("image/jpeg", quality);
-
-        if (dataUrlByteSize(compressed) <= MAX_REFERENCE_IMAGE_BYTES) {
-          break;
-        }
-
-        quality = Math.max(0.55, quality - 0.1);
-        targetWidth = Math.max(1, Math.round(targetWidth * 0.85));
-        targetHeight = Math.max(1, Math.round(targetHeight * 0.85));
+    const processed: ReferenceImage[] = [];
+    for (const file of selected) {
+      try {
+        const result = await compressImage(file);
+        if (result) processed.push(result);
+        else toast.error(`"${file.name}" is too large after compression.`);
+      } catch {
+        toast.error(`Could not process "${file.name}".`);
       }
+    }
 
-      if (dataUrlByteSize(compressed) > MAX_REFERENCE_IMAGE_BYTES) {
-        toast.error("Image is too large. Please upload a smaller image.");
-        return;
-      }
-
-      setReferenceImage(compressed);
-      setReferenceImageName(file.name);
-      setReferenceImageSizeLabel(
-        `${Math.round(dataUrlByteSize(compressed) / 1024)} KB`,
+    if (processed.length > 0) {
+      setReferenceImages((prev) => [...prev, ...processed]);
+    }
+    if (skipped > 0) {
+      toast.error(
+        `Only ${MAX_REFERENCE_IMAGES} reference images are allowed — extra ${skipped} ignored.`,
       );
-    } catch {
-      toast.error("Could not process image upload.");
     }
   };
+
+  const removeReferenceAt = (index: number) => {
+    setReferenceImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const atCap = referenceImages.length >= MAX_REFERENCE_IMAGES;
 
   return (
     <div className="space-y-3">
@@ -190,51 +233,62 @@ export default function PromptInput({
         <div className="space-y-2">
           <label className="text-xs text-white/45 inline-flex items-center gap-1.5">
             <ImagePlus className="h-3.5 w-3.5" />
-            Reference image (optional)
+            Reference images (optional, up to {MAX_REFERENCE_IMAGES})
+            {referenceImages.length > 0 && (
+              <span className="text-white/30">
+                · {referenceImages.length}/{MAX_REFERENCE_IMAGES}
+              </span>
+            )}
           </label>
 
-          {!referenceImage && (
-            <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-3 text-sm text-white/60 hover:border-white/25 hover:bg-white/[0.05] transition-all">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  void handleImageChange(e.target.files?.[0] ?? null);
-                }}
-                disabled={isGenerating}
-              />
-              Upload sketch or reference image
-            </label>
-          )}
-
-          {referenceImage && (
-            <div className="relative w-fit rounded-xl border border-white/10 bg-white/[0.03] p-2">
-              <img
-                src={referenceImage}
-                alt="Reference"
-                className="h-28 w-28 rounded-lg object-cover"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setReferenceImage(undefined);
-                  setReferenceImageName(undefined);
-                  setReferenceImageSizeLabel(undefined);
-                }}
-                className="absolute -top-2 -right-2 rounded-full bg-black/75 p-1 text-white/80 hover:text-white"
-                aria-label="Remove reference image"
+          <div className="flex flex-wrap items-start gap-2">
+            {referenceImages.map((ref, i) => (
+              <div
+                key={`${ref.name}-${i}`}
+                className="relative w-fit rounded-xl border border-white/10 bg-white/[0.03] p-2"
               >
-                <X className="h-3.5 w-3.5" />
-              </button>
-              <p className="mt-1.5 max-w-28 truncate text-[11px] text-white/45">
-                {referenceImageName || "Reference image"}
-              </p>
-              {referenceImageSizeLabel && (
-                <p className="text-[11px] text-white/35">{referenceImageSizeLabel}</p>
-              )}
-            </div>
-          )}
+                <img
+                  src={ref.dataUrl}
+                  alt={`Reference ${i + 1}`}
+                  className="h-24 w-24 rounded-lg object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeReferenceAt(i)}
+                  className="absolute -top-2 -right-2 rounded-full bg-black/75 p-1 text-white/80 hover:text-white"
+                  aria-label={`Remove reference image ${i + 1}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                <p className="mt-1.5 max-w-24 truncate text-[11px] text-white/45">
+                  {ref.name}
+                </p>
+                <p className="text-[11px] text-white/35">{ref.sizeLabel}</p>
+              </div>
+            ))}
+
+            {!atCap && (
+              <label className="flex h-[124px] w-[124px] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-3 py-2 text-center text-xs text-white/60 hover:border-white/25 hover:bg-white/[0.05] transition-all">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                  disabled={isGenerating}
+                />
+                <ImagePlus className="h-5 w-5 text-white/50" />
+                <span>
+                  {referenceImages.length === 0
+                    ? "Add reference images"
+                    : `Add more (${MAX_REFERENCE_IMAGES - referenceImages.length} left)`}
+                </span>
+              </label>
+            )}
+          </div>
         </div>
       )}
 

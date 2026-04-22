@@ -13,7 +13,8 @@ import LoginGate from "@/components/LoginGate";
 import Spinner from "@/components/ui/Spinner";
 import { AlertTriangle, X } from "lucide-react";
 import Button from "@/components/ui/Button";
-import { DEFAULT_MODEL, MODELS } from "@/lib/constants";
+import { DEFAULT_MODEL_ID } from "@/lib/constants";
+import type { ImageModel } from "@/lib/models";
 import { addToGallery } from "@/lib/gallery";
 
 interface GeneratedImage {
@@ -26,7 +27,8 @@ interface GeneratedImage {
 export default function CreatePage() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [balance, setBalance] = useState<number | undefined>();
-  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL.id);
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL_ID);
+  const [models, setModels] = useState<ImageModel[]>([]);
   const [selectedStyle, setSelectedStyle] = useState<string>("none");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -129,7 +131,7 @@ export default function CreatePage() {
     window.open(url, "agnic-topup", `width=${width},height=${height},left=${left},top=${top},popup=yes`);
   };
 
-  const handleGenerate = async (prompt: string, referenceImage?: string) => {
+  const handleGenerate = async (prompt: string, referenceImages?: string[]) => {
     setIsGenerating(true);
     setGeneratedImage(null);
     setImageSaved(false);
@@ -140,7 +142,7 @@ export default function CreatePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt,
-          referenceImage,
+          referenceImages,
           model: selectedModel,
           style: selectedStyle,
         }),
@@ -169,12 +171,24 @@ export default function CreatePage() {
 
       setShowTopUp(false);
 
+      const finalModel = data.model || selectedModel;
       setGeneratedImage({
         image: data.image,
         prompt,
-        model: data.model || selectedModel,
+        model: finalModel,
         style: selectedStyle,
       });
+
+      // Auto-save every successful generation to the local gallery. Keeping
+      // imageSaved true hides the manual save button — users were hitting
+      // this as a bug because the action was silent and easy to miss.
+      addToGallery({
+        image: data.image,
+        prompt,
+        model: finalModel,
+        style: selectedStyle,
+      });
+      setImageSaved(true);
 
       if (data.balance !== undefined) {
         setBalance(data.balance);
@@ -225,18 +239,6 @@ export default function CreatePage() {
     }
   };
 
-  const handleSave = () => {
-    if (!generatedImage) return;
-    addToGallery({
-      image: generatedImage.image,
-      prompt: generatedImage.prompt,
-      model: generatedImage.model,
-      style: generatedImage.style,
-    });
-    setImageSaved(true);
-    toast.success("Saved to gallery!");
-  };
-
   const handleLogout = async () => {
     await fetch("/api/session", { method: "DELETE" });
     setAuthenticated(false);
@@ -273,7 +275,7 @@ export default function CreatePage() {
   }
 
   // Authenticated — full creation UI
-  const selectedModelConfig = MODELS.find((m) => m.id === selectedModel);
+  const selectedModelConfig = models.find((m) => m.id === selectedModel);
 
   return (
     <>
@@ -307,6 +309,7 @@ export default function CreatePage() {
               <ModelSelector
                 selectedModel={selectedModel}
                 onSelect={setSelectedModel}
+                onModelsLoaded={setModels}
               />
               <StyleSelector
                 selectedStyle={selectedStyle}
@@ -356,14 +359,17 @@ export default function CreatePage() {
             {isGenerating && <GenerationStatus />}
 
             {generatedImage && !isGenerating && (
-              <div className="max-w-lg mx-auto">
+              <div className="max-w-lg mx-auto space-y-2">
                 <ImageCard
                   image={generatedImage.image}
                   prompt={generatedImage.prompt}
                   model={generatedImage.model}
-                  onSave={handleSave}
-                  saved={imageSaved}
                 />
+                {imageSaved && (
+                  <p className="text-center text-xs text-white/40">
+                    Saved to your gallery
+                  </p>
+                )}
               </div>
             )}
           </div>

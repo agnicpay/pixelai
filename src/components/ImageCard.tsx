@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Download, Save, Maximize2, X, Trash2 } from "lucide-react";
+import { Check, Copy, Download, Save, Maximize2, X, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { truncate, formatCost } from "@/lib/utils";
@@ -29,12 +30,25 @@ export default function ImageCard({
   saved,
 }: ImageCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleDownload = () => {
     const link = document.createElement("a");
     link.href = image;
     link.download = `dreamt-${Date.now()}.png`;
     link.click();
+  };
+
+  const handleCopyPrompt = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopied(true);
+      toast.success("Prompt copied");
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      toast.error("Couldn’t copy to clipboard");
+    }
   };
 
   return (
@@ -59,9 +73,27 @@ export default function ImageCard({
         </div>
 
         <div className="p-4 space-y-3">
-          <p className="text-sm text-white/70 leading-relaxed">
-            {truncate(prompt, 120)}
-          </p>
+          <div className="group/prompt relative">
+            <p
+              className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap break-words pr-8"
+              title="Click the copy button to copy the full prompt"
+            >
+              {truncate(prompt, 180)}
+            </p>
+            <button
+              type="button"
+              onClick={handleCopyPrompt}
+              className="absolute top-0 right-0 rounded-md p-1.5 text-white/40 hover:bg-white/[0.06] hover:text-white/90 transition-colors"
+              aria-label="Copy prompt"
+              title={copied ? "Copied" : "Copy prompt"}
+            >
+              {copied ? (
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -125,14 +157,29 @@ export default function ImageCard({
               alt={prompt}
               className="w-full h-full object-contain rounded-xl"
             />
-            <div className="mt-3 glass rounded-xl p-4">
-              <p className="text-sm text-white/70">{prompt}</p>
-              <div className="flex items-center gap-2 mt-2">
+            <div className="mt-3 glass rounded-xl p-4 space-y-3">
+              <p className="text-sm text-white/80 whitespace-pre-wrap break-words leading-relaxed">
+                {prompt}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
                 {model && (
                   <Badge>
                     {model.split("/").pop()?.replace(/-/g, " ")}
                   </Badge>
                 )}
+                <Button variant="ghost" size="sm" onClick={handleCopyPrompt}>
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      Copy prompt
+                    </>
+                  )}
+                </Button>
                 <Button variant="ghost" size="sm" onClick={handleDownload}>
                   <Download className="w-4 h-4" />
                   Download

@@ -12,16 +12,24 @@ export async function generateImage(
   prompt: string,
   model: string,
   accessToken: string,
-  referenceImage?: string,
+  referenceImages?: string[],
 ) {
   const client = createAgnicClient(accessToken);
 
-  const content = referenceImage
-    ? [
-        { type: "text", text: prompt },
-        { type: "image_url", image_url: { url: referenceImage } },
-      ]
-    : prompt;
+  const refs = (referenceImages || []).filter(
+    (s): s is string => typeof s === "string" && s.length > 0,
+  );
+
+  const content =
+    refs.length > 0
+      ? [
+          { type: "text", text: prompt },
+          ...refs.map((url) => ({
+            type: "image_url" as const,
+            image_url: { url },
+          })),
+        ]
+      : prompt;
 
   const response = await client.chat.completions.create({
     model,

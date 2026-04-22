@@ -1,5 +1,3 @@
-"use client";
-
 import { ArrowRight, Check } from "lucide-react";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
@@ -7,23 +5,47 @@ import Footer from "@/components/layout/Footer";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
-import { MODELS } from "@/lib/constants";
-import { formatCost } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { fetchImageModels, type ImageModel } from "@/lib/models";
+import SessionAwareHeader from "./SessionAwareHeader";
 
-export default function PricingPage() {
-  const [authenticated, setAuthenticated] = useState(false);
+export const revalidate = 300;
 
-  useEffect(() => {
-    fetch("/api/session")
-      .then((r) => r.json())
-      .then((d) => setAuthenticated(d.authenticated))
-      .catch(() => {});
-  }, []);
+function formatPerImage(m: ImageModel): string {
+  if (m.perImageEstimate !== null) {
+    const v = m.perImageEstimate;
+    if (v < 0.001) return `$${v.toFixed(5)}`;
+    if (v < 0.01) return `$${v.toFixed(4)}`;
+    return `$${v.toFixed(3)}`;
+  }
+  return m.unitPriceLabel || "per-unit";
+}
+
+function imagesPerDollar(m: ImageModel, dollars: number): string {
+  if (m.perImageEstimate !== null && m.perImageEstimate > 0) {
+    return `~${Math.floor(dollars / m.perImageEstimate).toLocaleString()}`;
+  }
+  return "—";
+}
+
+function tagVariant(tag: string): "default" | "accent" | "success" | "warning" {
+  if (tag === "Best Value") return "success";
+  if (tag === "Cheapest") return "accent";
+  if (tag === "High Quality" || tag === "Premium") return "warning";
+  return "default";
+}
+
+export default async function PricingPage() {
+  let models: ImageModel[] = [];
+  let loadError: string | null = null;
+  try {
+    models = await fetchImageModels();
+  } catch (err) {
+    loadError = err instanceof Error ? err.message : "Failed to load models";
+  }
 
   return (
     <>
-      <Header authenticated={authenticated} />
+      <SessionAwareHeader />
       <main className="flex-1">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-16">
           {/* Hero */}
@@ -49,11 +71,11 @@ export default function PricingPage() {
 
             <div className="space-y-3 text-left">
               {[
-                "~4,000 images with default model for $5",
                 "Pay only for what you use",
                 "Auto-recharge in your wallet",
                 "No subscriptions or commitments",
                 "Fund your wallet with USDC or card",
+                "20% below upstream provider rates",
               ].map((item, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm text-white/60">
                   <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
@@ -76,6 +98,12 @@ export default function PricingPage() {
               Per-image pricing by model
             </h2>
 
+            {loadError && (
+              <p className="text-center text-sm text-red-400">
+                Couldn&apos;t load live pricing: {loadError}
+              </p>
+            )}
+
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -96,7 +124,7 @@ export default function PricingPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {MODELS.map((model) => (
+                    {models.map((model) => (
                       <tr
                         key={model.id}
                         className="border-b border-white/[0.03] hover:bg-white/[0.02]"
@@ -104,32 +132,25 @@ export default function PricingPage() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">
-                              {model.name}
+                              {model.shortName}
                             </span>
-                            {model.default && (
+                            {model.isDefault && (
                               <Badge variant="accent">Default</Badge>
                             )}
                           </div>
+                          <div className="text-[11px] text-white/30 font-mono mt-0.5">
+                            {model.id}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right text-sm text-white/70 font-mono">
+                          {formatPerImage(model)}
                         </td>
                         <td className="px-6 py-4 text-right text-sm text-white/70">
-                          {formatCost(model.cost)}
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm text-white/70">
-                          ~{Math.floor(5 / model.cost).toLocaleString()}
+                          {imagesPerDollar(model, 5)}
                         </td>
                         <td className="px-6 py-4 text-right">
                           {model.tag && (
-                            <Badge
-                              variant={
-                                model.tag === "Best Value"
-                                  ? "success"
-                                  : model.tag === "Cheapest"
-                                    ? "accent"
-                                    : model.tag === "High Quality"
-                                      ? "warning"
-                                      : "default"
-                              }
-                            >
+                            <Badge variant={tagVariant(model.tag)}>
                               {model.tag}
                             </Badge>
                           )}
@@ -140,6 +161,13 @@ export default function PricingPage() {
                 </table>
               </div>
             </Card>
+
+            <p className="text-xs text-white/40 text-center max-w-2xl mx-auto">
+              Per-image estimates assume typical output size and include the
+              Agnic 20% discount vs. upstream OpenRouter rates. Models marked
+              &quot;per-unit&quot; are billed directly by the provider per
+              generation (see the model&apos;s description for exact pricing).
+            </p>
           </div>
 
           {/* How billing works */}
